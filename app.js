@@ -16,7 +16,7 @@ const PLACEHOLDER_POSTER = `data:image/svg+xml,${encodeURIComponent('<svg xmlns=
 const PLACEHOLDER_PROFILE = `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="185" height="185" fill="#1a1a1a"><rect width="185" height="185"/><text x="92" y="100" fill="#5a5550" font-family="sans-serif" font-size="14" text-anchor="middle">?</text></svg>')}`;
 
 // --- State ---
-let API_KEY = localStorage.getItem('tmdb_api_key') || '';
+let API_KEY = 'eea8978d5fdf3a39605a96b69fc2e0c2';
 let genres = {};
 let searchPage = 1;
 let searchQuery = '';
