@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="CineScope — Search and discover movies. Browse trending films, ratings, and details.">
+    <title>CineScope</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Serif+Display&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Navbar -->
+    <nav id="navbar" class="navbar">
+        <div class="nav-container">
+            <a href="#" class="logo" id="logo">CineScope</a>
+            <div class="nav-links">
+                <a href="#" class="nav-link active" data-section="home" id="nav-home">Home</a>
+                <a href="#" class="nav-link" data-section="trending" id="nav-trending">Trending</a>
+                <a href="#" class="nav-link" data-section="top-rated" id="nav-toprated">Top Rated</a>
+                <a href="#" class="nav-link" data-section="upcoming" id="nav-upcoming">Upcoming</a>
+            </div>
+            <div class="nav-search" id="nav-search">
+                <svg class="search-icon-nav" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+                </svg>
+                <input type="text" id="nav-search-input" placeholder="Search..." autocomplete="off">
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero -->
+    <section id="hero" class="hero">
+        <div class="hero-bg"></div>
+        <div class="hero-overlay"></div>
+        <div class="hero-content">
+            <h1 class="hero-title">Find something<br>worth watching.</h1>
+            <p class="hero-subtitle">Search thousands of films — from new releases to all-time classics.</p>
+            <div class="hero-search" id="hero-search">
+                <div class="search-wrapper">
+                    <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+                    </svg>
+                    <input type="text" id="search-input" placeholder="Search for a movie..." autocomplete="off">
+                    <button id="search-btn" class="search-btn">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                    </button>
+                </div>
+                <div class="search-suggestions" id="search-suggestions"></div>
+            </div>
+            <div class="hero-genres" id="hero-genres"></div>
+        </div>
+    </section>
+
+    <!-- Featured -->
+    <section id="spotlight-section" class="section spotlight-section">
+        <div class="section-container">
+            <div class="spotlight-card" id="spotlight-card">
+                <div class="spotlight-backdrop" id="spotlight-backdrop"></div>
+                <div class="spotlight-overlay"></div>
+                <div class="spotlight-content">
+                    <div class="spotlight-info">
+                        <span class="spotlight-badge">Featured</span>
+                        <h2 class="spotlight-title" id="spotlight-title">Loading...</h2>
+                        <div class="spotlight-meta" id="spotlight-meta"></div>
+                        <p class="spotlight-overview" id="spotlight-overview"></p>
+                        <div class="spotlight-actions">
+                            <button class="btn-primary" id="spotlight-details-btn">View Details</button>
+                            <button class="btn-secondary" id="spotlight-trailer-btn">
+                                <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                                Trailer
+                            </button>
+                        </div>
+                    </div>
+                    <div class="spotlight-poster" id="spotlight-poster"></div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Trending -->
+    <section id="trending-section" class="section">
+        <div class="section-container">
+            <div class="section-header">
+                <div>
+                    <h2 class="section-title">Trending</h2>
+                    <p class="section-subtitle">What people are watching right now</p>
+                </div>
+                <div class="section-tabs">
+                    <button class="tab active" data-time="day" id="trending-day-tab">Today</button>
+                    <button class="tab" data-time="week" id="trending-week-tab">This Week</button>
+                </div>
+            </div>
+            <div class="movies-carousel" id="trending-carousel">
+                <button class="carousel-btn carousel-prev" id="trending-prev">&#8249;</button>
+                <div class="movies-row" id="trending-movies"></div>
+                <button class="carousel-btn carousel-next" id="trending-next">&#8250;</button>
+            </div>
+        </div>
+    </section>
+
+    <!-- Top Rated -->
+    <section id="top-rated-section" class="section">
+        <div class="section-container">
+            <div class="section-header">
+                <div>
+                    <h2 class="section-title">Top Rated</h2>
+                    <p class="section-subtitle">The highest rated films of all time</p>
+                </div>
+            </div>
+            <div class="movies-carousel" id="toprated-carousel">
+                <button class="carousel-btn carousel-prev" id="toprated-prev">&#8249;</button>
+                <div class="movies-row" id="toprated-movies"></div>
+                <button class="carousel-btn carousel-next" id="toprated-next">&#8250;</button>
+            </div>
+        </div>
+    </section>
+
+    <!-- Upcoming -->
+    <section id="upcoming-section" class="section">
+        <div class="section-container">
+            <div class="section-header">
+                <div>
+                    <h2 class="section-title">Coming Soon</h2>
+                    <p class="section-subtitle">Films releasing in the weeks ahead</p>
+                </div>
+            </div>
+            <div class="movies-carousel" id="upcoming-carousel">
+                <button class="carousel-btn carousel-prev" id="upcoming-prev">&#8249;</button>
+                <div class="movies-row" id="upcoming-movies"></div>
+                <button class="carousel-btn carousel-next" id="upcoming-next">&#8250;</button>
+            </div>
+        </div>
+    </section>
+
+    <!-- Search Results -->
+    <section id="search-results-section" class="section hidden">
+        <div class="section-container">
+            <div class="section-header">
+                <div>
+                    <h2 class="section-title" id="search-results-title">Search Results</h2>
+                    <p class="section-subtitle" id="search-results-subtitle"></p>
+                </div>
+                <button class="btn-secondary" id="clear-search-btn">Clear Search</button>
+            </div>
+            <div class="movies-grid" id="search-results-grid"></div>
+            <div class="load-more-container" id="load-more-container">
+                <button class="btn-primary" id="load-more-btn">Load More</button>
+            </div>
+        </div>
+    </section>
+
+    <!-- Movie Detail Modal -->
+    <div class="modal-overlay" id="modal-overlay">
+        <div class="modal" id="movie-modal">
+            <button class="modal-close" id="modal-close">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
+            </button>
+            <div class="modal-backdrop" id="modal-backdrop"></div>
+            <div class="modal-body">
+                <div class="modal-poster-container">
+                    <img class="modal-poster" id="modal-poster" alt="Movie poster">
+                    <div class="modal-rating-badge" id="modal-rating-badge">
+                        <span id="modal-rating">0</span>
+                    </div>
+                </div>
+                <div class="modal-info">
+                    <h2 class="modal-title" id="modal-title">Movie Title</h2>
+                    <div class="modal-tagline" id="modal-tagline"></div>
+                    <div class="modal-meta" id="modal-meta"></div>
+                    <div class="modal-genres" id="modal-genres"></div>
+                    <div class="modal-overview-section">
+                        <h3>Overview</h3>
+                        <p id="modal-overview">Loading...</p>
+                    </div>
+                    <div class="modal-details-grid" id="modal-details-grid"></div>
+                    <div class="modal-cast-section" id="modal-cast-section">
+                        <h3>Cast</h3>
+                        <div class="cast-row" id="modal-cast"></div>
+                    </div>
+                    <div class="modal-similar-section" id="modal-similar-section">
+                        <h3>Similar Films</h3>
+                        <div class="similar-row" id="modal-similar"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Trailer Modal -->
+    <div class="trailer-overlay" id="trailer-overlay">
+        <button class="trailer-close" id="trailer-close">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
+        <div class="trailer-container" id="trailer-container"></div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="footer-container">
+            <div class="footer-brand">
+                <span class="footer-logo">CineScope</span>
+                <p class="footer-desc">A simpler way to find your next film.</p>
+            </div>
+            <div class="footer-attribution">
+                <p>Data from <a href="https://www.themoviedb.org/" target="_blank" rel="noopener">TMDB</a></p>
+                <p class="footer-copy">&copy; 2026 CineScope</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loading-overlay">
+        <div class="loader">
+            <span class="loader-text">CineScope</span>
+            <div class="loader-bar"><div class="loader-bar-fill"></div></div>
+        </div>
+    </div>
+
+    <!-- API Key Modal -->
+    <div class="api-modal-overlay" id="api-modal-overlay">
+        <div class="api-modal">
+            <h2>CineScope</h2>
+            <p>Enter your TMDB API key to get started.<br>Get a free key at <a href="https://www.themoviedb.org/settings/api" target="_blank" rel="noopener">themoviedb.org</a></p>
+            <input type="text" id="api-key-input" placeholder="Paste your API key" autocomplete="off">
+            <button id="api-key-submit" class="btn-primary">Continue</button>
+            <p class="api-hint">Stored locally in your browser. Never shared.</p>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
