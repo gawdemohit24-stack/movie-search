@@ -28,9 +28,6 @@ const $ = (id) => document.getElementById(id);
 
 const dom = {
     loadingOverlay: $('loading-overlay'),
-    apiModalOverlay: $('api-modal-overlay'),
-    apiKeyInput: $('api-key-input'),
-    apiKeySubmit: $('api-key-submit'),
     navbar: $('navbar'),
     navSearchInput: $('nav-search-input'),
     searchInput: $('search-input'),
@@ -623,54 +620,6 @@ function setupCarousels() {
     setupCarousel('trending-movies', 'trending-prev', 'trending-next');
     setupCarousel('toprated-movies', 'toprated-prev', 'toprated-next');
     setupCarousel('upcoming-movies', 'upcoming-prev', 'upcoming-next');
-}
-
-// --- API Key Flow ---
-function setupApiKeyFlow() {
-    if (API_KEY) {
-        dom.apiModalOverlay.classList.add('fade-out');
-        initApp();
-        return;
-    }
-
-    dom.loadingOverlay.classList.add('fade-out');
-
-    dom.apiKeySubmit.addEventListener('click', submitApiKey);
-    dom.apiKeyInput.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') submitApiKey();
-    });
-}
-
-async function submitApiKey() {
-    const key = dom.apiKeyInput.value.trim();
-    if (!key) {
-        dom.apiKeyInput.style.borderColor = 'var(--accent-red)';
-        return;
-    }
-
-    dom.apiKeySubmit.textContent = 'Verifying...';
-    dom.apiKeySubmit.disabled = true;
-
-    try {
-        const url = new URL(`${TMDB_BASE}/movie/popular`);
-        url.searchParams.set('api_key', key);
-        const res = await fetch(url);
-        if (!res.ok) throw new Error('Invalid key');
-
-        API_KEY = key;
-        localStorage.setItem('tmdb_api_key', key);
-        dom.apiModalOverlay.classList.add('fade-out');
-
-        dom.loadingOverlay.classList.remove('fade-out');
-        await initApp();
-    } catch (err) {
-        dom.apiKeyInput.style.borderColor = 'var(--accent-red)';
-        dom.apiKeySubmit.textContent = 'Invalid key — try again';
-        dom.apiKeySubmit.disabled = false;
-        setTimeout(() => {
-            dom.apiKeySubmit.textContent = 'Continue';
-        }, 2000);
-    }
 }
 
 // --- Init ---
