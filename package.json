@@ -1,0 +1,16 @@
+{
+  "name": "cinescope",
+  "version": "1.0.0",
+  "description": "CineScope — Movie search with user auth",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "sql.js": "^1.10.0",
+    "bcryptjs": "^2.4.3",
+    "express-session": "^1.17.3"
+  }
+}

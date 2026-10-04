@@ -21,11 +21,44 @@
                 <a href="#" class="nav-link" data-section="top-rated" id="nav-toprated">Top Rated</a>
                 <a href="#" class="nav-link" data-section="upcoming" id="nav-upcoming">Upcoming</a>
             </div>
-            <div class="nav-search" id="nav-search">
-                <svg class="search-icon-nav" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
-                </svg>
-                <input type="text" id="nav-search-input" placeholder="Search..." autocomplete="off">
+            <div class="nav-right">
+                <div class="nav-search" id="nav-search">
+                    <svg class="search-icon-nav" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+                    </svg>
+                    <input type="text" id="nav-search-input" placeholder="Search..." autocomplete="off">
+                </div>
+                <!-- Logged out: show login button -->
+                <button class="nav-auth-btn" id="nav-login-btn">Sign In</button>
+                <!-- Logged in: show user avatar -->
+                <div class="nav-user" id="nav-user" style="display:none;">
+                    <button class="user-avatar-btn" id="user-avatar-btn">
+                        <span class="user-avatar-letter" id="user-avatar-letter">U</span>
+                    </button>
+                    <div class="user-dropdown" id="user-dropdown">
+                        <div class="user-dropdown-header">
+                            <div class="user-dropdown-avatar" id="dropdown-avatar">U</div>
+                            <div class="user-dropdown-info">
+                                <div class="user-dropdown-name" id="dropdown-name">User</div>
+                                <div class="user-dropdown-email" id="dropdown-email">user@email.com</div>
+                            </div>
+                        </div>
+                        <div class="user-dropdown-divider"></div>
+                        <button class="user-dropdown-item" id="dropdown-favorites">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+                            My Favorites <span class="dropdown-count" id="dropdown-fav-count">0</span>
+                        </button>
+                        <button class="user-dropdown-item" id="dropdown-watchlist">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+                            My Watchlist <span class="dropdown-count" id="dropdown-watch-count">0</span>
+                        </button>
+                        <div class="user-dropdown-divider"></div>
+                        <button class="user-dropdown-item user-dropdown-logout" id="dropdown-logout">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg>
+                            Sign Out
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
     </nav>
@@ -134,6 +167,34 @@
         </div>
     </section>
 
+    <!-- Favorites Section -->
+    <section id="favorites-section" class="section hidden">
+        <div class="section-container">
+            <div class="section-header">
+                <div>
+                    <h2 class="section-title">My Favorites</h2>
+                    <p class="section-subtitle" id="favorites-subtitle">Films you love</p>
+                </div>
+                <button class="btn-secondary" id="close-favorites-btn">Back to Home</button>
+            </div>
+            <div class="movies-grid" id="favorites-grid"></div>
+        </div>
+    </section>
+
+    <!-- Watchlist Section -->
+    <section id="watchlist-section" class="section hidden">
+        <div class="section-container">
+            <div class="section-header">
+                <div>
+                    <h2 class="section-title">My Watchlist</h2>
+                    <p class="section-subtitle" id="watchlist-subtitle">Films to watch later</p>
+                </div>
+                <button class="btn-secondary" id="close-watchlist-btn">Back to Home</button>
+            </div>
+            <div class="movies-grid" id="watchlist-grid"></div>
+        </div>
+    </section>
+
     <!-- Search Results -->
     <section id="search-results-section" class="section hidden">
         <div class="section-container">
@@ -204,7 +265,7 @@
                 <p class="footer-desc">A simpler way to find your next film.</p>
             </div>
             <div class="footer-attribution">
-                <p>Data from <a href="https://www.themoviedb.org/" target="_blank" rel="noopener">TMDB</a></p>
+                <p>Data from <a href="https://www.omdbapi.com/" target="_blank" rel="noopener">OMDb API</a></p>
                 <p class="footer-copy">&copy; 2026 CineScope</p>
             </div>
         </div>
@@ -218,7 +279,55 @@
         </div>
     </div>
 
+    <!-- Auth Modal -->
+    <div class="auth-overlay" id="auth-overlay">
+        <div class="auth-modal" id="auth-modal">
+            <button class="auth-close" id="auth-close">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
+            </button>
+            <div class="auth-header">
+                <h2 class="auth-brand">CineScope</h2>
+                <p class="auth-tagline">Your personal cinema companion</p>
+            </div>
+            <div class="auth-tabs">
+                <button class="auth-tab active" id="auth-tab-login" data-tab="login">Sign In</button>
+                <button class="auth-tab" id="auth-tab-register" data-tab="register">Create Account</button>
+            </div>
+            <!-- Login Form -->
+            <form class="auth-form" id="login-form">
+                <div class="auth-field">
+                    <label for="login-email">Email</label>
+                    <input type="email" id="login-email" placeholder="you@example.com" required autocomplete="email">
+                </div>
+                <div class="auth-field">
+                    <label for="login-password">Password</label>
+                    <input type="password" id="login-password" placeholder="Your password" required autocomplete="current-password">
+                </div>
+                <div class="auth-error" id="login-error"></div>
+                <button type="submit" class="auth-submit" id="login-submit">Sign In</button>
+            </form>
+            <!-- Register Form -->
+            <form class="auth-form" id="register-form" style="display:none;">
+                <div class="auth-field">
+                    <label for="register-username">Username</label>
+                    <input type="text" id="register-username" placeholder="Choose a username" required minlength="3" autocomplete="username">
+                </div>
+                <div class="auth-field">
+                    <label for="register-email">Email</label>
+                    <input type="email" id="register-email" placeholder="you@example.com" required autocomplete="email">
+                </div>
+                <div class="auth-field">
+                    <label for="register-password">Password</label>
+                    <input type="password" id="register-password" placeholder="Min 6 characters" required minlength="6" autocomplete="new-password">
+                </div>
+                <div class="auth-error" id="register-error"></div>
+                <button type="submit" class="auth-submit" id="register-submit">Create Account</button>
+            </form>
+        </div>
+    </div>
 
+    <!-- Toast Notifications -->
+    <div class="toast-container" id="toast-container"></div>
 
     <script src="app.js"></script>
 </body>
