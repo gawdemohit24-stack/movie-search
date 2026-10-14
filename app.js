@@ -3,7 +3,7 @@
    Powered by OMDB API
    ======================================== */
 
-// --- API Base (use current origin so it works on localhost:3000) ---
+// --- API Base (use current origin so it works on localhost:5502) ---
 const API_BASE = window.location.origin;
 
 // --- Constants ---
@@ -247,7 +247,7 @@ async function handleLogin(e) {
         await checkAuth(); // refresh counts
     } catch (err) {
         console.error('Login error:', err);
-        dom.loginError.textContent = 'Cannot connect to server. Make sure you opened http://localhost:3000';
+        dom.loginError.textContent = 'Cannot connect to server. Make sure you opened http://localhost:5502';
     } finally {
         submitBtn.disabled = false;
         submitBtn.textContent = 'Sign In';
@@ -283,7 +283,7 @@ async function handleRegister(e) {
         await checkAuth();
     } catch (err) {
         console.error('Register error:', err);
-        dom.registerError.textContent = 'Cannot connect to server. Make sure you opened http://localhost:3000';
+        dom.registerError.textContent = 'Cannot connect to server. Make sure you opened http://localhost:5502';
     } finally {
         submitBtn.disabled = false;
         submitBtn.textContent = 'Create Account';
