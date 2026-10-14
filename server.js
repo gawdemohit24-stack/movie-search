@@ -12,7 +12,7 @@ const path = require('path');
 const fs = require('fs');
 
 const app = express();
-const PORT = 3000;
+const PORT = 5502;
 const DB_PATH = path.join(__dirname, 'cinescope.sqlite');
 
 let db; // SQLite database instance
