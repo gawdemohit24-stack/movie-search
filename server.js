@@ -1,6 +1,7 @@
 /* ========================================
    CineScope — Express Server with SQLite Auth
    Uses sql.js (pure JS SQLite, no native deps)
+   Now powered by OMDB API
    ======================================== */
 
 const express = require('express');
@@ -51,7 +52,7 @@ async function initDatabase() {
     CREATE TABLE IF NOT EXISTS favorites (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id INTEGER NOT NULL,
-      movie_id INTEGER NOT NULL,
+      movie_id TEXT NOT NULL,
       movie_title TEXT,
       movie_poster TEXT,
       movie_rating REAL,
@@ -65,7 +66,7 @@ async function initDatabase() {
     CREATE TABLE IF NOT EXISTS watchlist (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id INTEGER NOT NULL,
-      movie_id INTEGER NOT NULL,
+      movie_id TEXT NOT NULL,
       movie_title TEXT,
       movie_poster TEXT,
       movie_rating REAL,
@@ -267,12 +268,12 @@ app.post('/api/favorites', requireAuth, (req, res) => {
 });
 
 app.delete('/api/favorites/:movieId', requireAuth, (req, res) => {
-  runQuery('DELETE FROM favorites WHERE user_id = ? AND movie_id = ?', [req.session.userId, parseInt(req.params.movieId)]);
+  runQuery('DELETE FROM favorites WHERE user_id = ? AND movie_id = ?', [req.session.userId, req.params.movieId]);
   res.json({ message: 'Removed from favorites' });
 });
 
 app.get('/api/favorites/check/:movieId', requireAuth, (req, res) => {
-  const row = getOne('SELECT id FROM favorites WHERE user_id = ? AND movie_id = ?', [req.session.userId, parseInt(req.params.movieId)]);
+  const row = getOne('SELECT id FROM favorites WHERE user_id = ? AND movie_id = ?', [req.session.userId, req.params.movieId]);
   res.json({ isFavorite: !!row });
 });
 
@@ -302,13 +303,98 @@ app.post('/api/watchlist', requireAuth, (req, res) => {
 });
 
 app.delete('/api/watchlist/:movieId', requireAuth, (req, res) => {
-  runQuery('DELETE FROM watchlist WHERE user_id = ? AND movie_id = ?', [req.session.userId, parseInt(req.params.movieId)]);
+  runQuery('DELETE FROM watchlist WHERE user_id = ? AND movie_id = ?', [req.session.userId, req.params.movieId]);
   res.json({ message: 'Removed from watchlist' });
 });
 
 app.get('/api/watchlist/check/:movieId', requireAuth, (req, res) => {
-  const row = getOne('SELECT id FROM watchlist WHERE user_id = ? AND movie_id = ?', [req.session.userId, parseInt(req.params.movieId)]);
+  const row = getOne('SELECT id FROM watchlist WHERE user_id = ? AND movie_id = ?', [req.session.userId, req.params.movieId]);
   res.json({ isInWatchlist: !!row });
+});
+
+// =========================================
+//  OMDB API PROXY
+// =========================================
+const https = require('https');
+const OMDB_API_KEY = 'f84fc31d';
+const OMDB_BASE_URL = 'https://www.omdbapi.com/';
+
+function omdbRequest(url) {
+  return new Promise((resolve, reject) => {
+    https.get(url, (response) => {
+      let data = '';
+      response.on('data', (chunk) => { data += chunk; });
+      response.on('end', () => {
+        try {
+          resolve({ status: response.statusCode, body: JSON.parse(data) });
+        } catch (e) {
+          reject(new Error('Invalid JSON from OMDB'));
+        }
+      });
+    }).on('error', (err) => {
+      reject(err);
+    });
+  });
+}
+
+// Search movies
+app.get('/api/omdb/search', async (req, res) => {
+  const { q, page = 1, type = 'movie' } = req.query;
+  if (!q) return res.status(400).json({ error: 'Query required' });
+
+  const url = `${OMDB_BASE_URL}?apikey=${OMDB_API_KEY}&s=${encodeURIComponent(q)}&page=${page}&type=${type}`;
+  try {
+    const result = await omdbRequest(url);
+    res.json(result.body);
+  } catch (err) {
+    console.error('OMDB search error:', err.message);
+    res.status(502).json({ error: 'Failed to reach OMDB API' });
+  }
+});
+
+// Get movie by IMDB ID
+app.get('/api/omdb/movie/:id', async (req, res) => {
+  const url = `${OMDB_BASE_URL}?apikey=${OMDB_API_KEY}&i=${req.params.id}&plot=full`;
+  try {
+    const result = await omdbRequest(url);
+    res.json(result.body);
+  } catch (err) {
+    console.error('OMDB detail error:', err.message);
+    res.status(502).json({ error: 'Failed to reach OMDB API' });
+  }
+});
+
+// Get movie by title
+app.get('/api/omdb/title', async (req, res) => {
+  const { t } = req.query;
+  if (!t) return res.status(400).json({ error: 'Title required' });
+
+  const url = `${OMDB_BASE_URL}?apikey=${OMDB_API_KEY}&t=${encodeURIComponent(t)}&plot=full`;
+  try {
+    const result = await omdbRequest(url);
+    res.json(result.body);
+  } catch (err) {
+    console.error('OMDB title error:', err.message);
+    res.status(502).json({ error: 'Failed to reach OMDB API' });
+  }
+});
+
+// Batch fetch multiple movies by IMDB IDs (for curated lists)
+app.post('/api/omdb/batch', async (req, res) => {
+  const { ids } = req.body;
+  if (!ids || !Array.isArray(ids)) return res.status(400).json({ error: 'ids array required' });
+
+  try {
+    const promises = ids.map(id => {
+      const url = `${OMDB_BASE_URL}?apikey=${OMDB_API_KEY}&i=${id}&plot=short`;
+      return omdbRequest(url).then(r => r.body).catch(() => null);
+    });
+    const results = await Promise.all(promises);
+    res.json({ results: results.filter(r => r && r.Response !== 'False') });
+  } catch (err) {
+    console.error('OMDB batch error:', err.message);
+    res.status(502).json({ error: 'Failed to reach OMDB API' });
+  }
 });
 
 // --- Start Server ---

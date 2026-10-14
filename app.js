@@ -1,31 +1,50 @@
 /* ========================================
    CineScope — Application Logic
+   Powered by OMDB API
    ======================================== */
 
 // --- API Base (use current origin so it works on localhost:3000) ---
 const API_BASE = window.location.origin;
 
 // --- Constants ---
-const TMDB_BASE = 'https://api.themoviedb.org/3';
-const IMG_BASE = 'https://image.tmdb.org/t/p';
-const IMG_SIZES = {
-    poster: `${IMG_BASE}/w500`,
-    backdrop: `${IMG_BASE}/w1280`,
-    profile: `${IMG_BASE}/w185`,
-    posterSmall: `${IMG_BASE}/w342`,
-    original: `${IMG_BASE}/original`,
-};
 const PLACEHOLDER_POSTER = `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="500" height="750" fill="#1a1a1a"><rect width="500" height="750"/><text x="250" y="375" fill="#5a5550" font-family="sans-serif" font-size="20" text-anchor="middle">No Image</text></svg>')}`;
 const PLACEHOLDER_PROFILE = `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="185" height="185" fill="#1a1a1a"><rect width="185" height="185"/><text x="92" y="100" fill="#5a5550" font-family="sans-serif" font-size="14" text-anchor="middle">?</text></svg>')}`;
 
+// --- Curated Movie Lists (IMDB IDs) ---
+const CURATED = {
+    trending: [
+        'tt6263850', 'tt1517268', 'tt15398776', 'tt14230458', 'tt11866324',
+        'tt13623148', 'tt10676048', 'tt9362722', 'tt5971474', 'tt14539740',
+        'tt12037194', 'tt7657566', 'tt21807222', 'tt6710474', 'tt9603212',
+        'tt14998742', 'tt13238346', 'tt12747748', 'tt11564570', 'tt8760708'
+    ],
+    topRated: [
+        'tt0111161', 'tt0068646', 'tt0468569', 'tt0071562', 'tt0050083',
+        'tt0108052', 'tt0167260', 'tt0110912', 'tt0120737', 'tt0060196',
+        'tt0137523', 'tt0109830', 'tt1375666', 'tt0080684', 'tt0167261',
+        'tt0133093', 'tt0099685', 'tt0073486', 'tt0076759', 'tt0816692'
+    ],
+    upcoming: [
+        'tt6263850', 'tt13623148', 'tt14539740', 'tt21807222', 'tt14998742',
+        'tt13238346', 'tt11564570', 'tt8760708', 'tt10676048', 'tt12037194',
+        'tt15398776', 'tt14230458', 'tt11866324', 'tt9362722', 'tt5971474',
+        'tt7657566', 'tt6710474', 'tt9603212', 'tt12747748', 'tt1517268'
+    ],
+};
+
+// --- Genre list (since OMDB doesn't have a genre endpoint) ---
+const GENRE_LIST = [
+    'Action', 'Comedy', 'Drama', 'Horror', 'Sci-Fi',
+    'Romance', 'Thriller', 'Animation', 'Adventure', 'Fantasy'
+];
+
 // --- State ---
-let API_KEY = 'eea8978d5fdf3a39605a96b69fc2e0c2';
-let genres = {};
 let searchPage = 1;
 let searchQuery = '';
 let currentSpotlightId = null;
 let searchDebounce = null;
 let currentUser = null;
+let totalSearchResults = 0;
 
 // --- DOM Elements ---
 const $ = (id) => document.getElementById(id);
@@ -393,8 +412,8 @@ function createSavedMovieCard(saved, index = 0) {
     card.className = 'movie-card';
     card.style.animationDelay = `${index * 0.04}s`;
 
-    const posterUrl = saved.movie_poster ? `${IMG_SIZES.poster}${saved.movie_poster}` : PLACEHOLDER_POSTER;
-    const rating = (saved.movie_rating || 0).toFixed(1);
+    const posterUrl = saved.movie_poster && saved.movie_poster !== 'N/A' ? saved.movie_poster : PLACEHOLDER_POSTER;
+    const rating = (saved.movie_rating || 0).toFixed ? Number(saved.movie_rating || 0).toFixed(1) : '0.0';
 
     card.innerHTML = `
         <div class="movie-card-poster">
@@ -429,23 +448,65 @@ function hideAllUserSections() {
     document.getElementById('upcoming-section').style.display = '';
 }
 
-// --- API ---
-async function tmdbFetch(endpoint, params = {}) {
-    const url = new URL(`${TMDB_BASE}${endpoint}`);
-    url.searchParams.set('api_key', API_KEY);
-    Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`TMDB API Error: ${res.status}`);
+// --- OMDB API Helpers ---
+async function omdbSearch(query, page = 1) {
+    const res = await fetch(`${API_BASE}/api/omdb/search?q=${encodeURIComponent(query)}&page=${page}`);
+    if (!res.ok) throw new Error(`OMDB API Error: ${res.status}`);
     return res.json();
 }
 
-async function fetchGenres() {
-    const data = await tmdbFetch('/genre/movie/list');
-    data.genres.forEach(g => genres[g.id] = g.name);
+async function omdbGetMovie(imdbId) {
+    const res = await fetch(`${API_BASE}/api/omdb/movie/${imdbId}`);
+    if (!res.ok) throw new Error(`OMDB API Error: ${res.status}`);
+    return res.json();
 }
 
-function getGenreNames(ids = []) {
-    return ids.map(id => genres[id]).filter(Boolean);
+async function omdbBatchFetch(ids) {
+    const res = await fetch(`${API_BASE}/api/omdb/batch`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids }),
+    });
+    if (!res.ok) throw new Error(`OMDB Batch Error: ${res.status}`);
+    return res.json();
+}
+
+// --- Normalize OMDB movie to common format ---
+function normalizeOMDBMovie(m) {
+    return {
+        id: m.imdbID,
+        title: m.Title,
+        year: m.Year,
+        poster: (m.Poster && m.Poster !== 'N/A') ? m.Poster : null,
+        rating: parseFloat(m.imdbRating) || 0,
+        plot: m.Plot || '',
+        genre: m.Genre || '',
+        runtime: m.Runtime || '',
+        director: m.Director || '',
+        actors: m.Actors || '',
+        writer: m.Writer || '',
+        rated: m.Rated || '',
+        released: m.Released || '',
+        language: m.Language || '',
+        country: m.Country || '',
+        awards: m.Awards || '',
+        metascore: m.Metascore || '',
+        imdbVotes: m.imdbVotes || '',
+        boxOffice: m.BoxOffice || '',
+        production: m.Production || '',
+        ratings: m.Ratings || [],
+        type: m.Type || 'movie',
+    };
+}
+
+function normalizeOMDBSearchResult(m) {
+    return {
+        id: m.imdbID,
+        title: m.Title,
+        year: m.Year,
+        poster: (m.Poster && m.Poster !== 'N/A') ? m.Poster : null,
+        type: m.Type || 'movie',
+    };
 }
 
 // --- Render ---
@@ -454,14 +515,14 @@ function createMovieCard(movie, index = 0) {
     card.className = 'movie-card';
     card.style.animationDelay = `${index * 0.04}s`;
 
-    const posterUrl = movie.poster_path ? `${IMG_SIZES.poster}${movie.poster_path}` : PLACEHOLDER_POSTER;
-    const year = (movie.release_date || '').substring(0, 4);
-    const rating = (movie.vote_average || 0).toFixed(1);
+    const posterUrl = movie.poster || PLACEHOLDER_POSTER;
+    const year = movie.year || '';
+    const rating = movie.rating ? movie.rating.toFixed(1) : '';
 
     card.innerHTML = `
         <div class="movie-card-poster">
             <img src="${posterUrl}" alt="${movie.title}" loading="lazy">
-            <div class="movie-card-rating">${rating}</div>
+            ${rating ? `<div class="movie-card-rating">${rating}</div>` : ''}
         </div>
         <div class="movie-card-info">
             <div class="movie-card-title">${movie.title}</div>
@@ -494,35 +555,33 @@ function setupCarousel(rowId, prevId, nextId) {
 
 // --- Genre Chips ---
 function renderGenreChips() {
-    const popular = [28, 35, 18, 27, 878, 10749, 53, 16, 12, 14];
     dom.heroGenres.innerHTML = '';
-    popular.forEach(id => {
-        if (genres[id]) {
-            const chip = document.createElement('button');
-            chip.className = 'genre-chip';
-            chip.textContent = genres[id];
-            chip.addEventListener('click', () => searchByGenre(id, genres[id]));
-            dom.heroGenres.appendChild(chip);
-        }
+    GENRE_LIST.forEach(genre => {
+        const chip = document.createElement('button');
+        chip.className = 'genre-chip';
+        chip.textContent = genre;
+        chip.addEventListener('click', () => searchByGenre(genre));
+        dom.heroGenres.appendChild(chip);
     });
 }
 
-async function searchByGenre(genreId, genreName) {
-    searchQuery = '';
+async function searchByGenre(genreName) {
+    searchQuery = genreName;
     searchPage = 1;
-    dom.searchInput.value = '';
-    dom.navSearchInput.value = '';
+    dom.searchInput.value = genreName;
+    dom.navSearchInput.value = genreName;
     dom.searchResultsTitle.textContent = `${genreName} Movies`;
     dom.searchResultsSubtitle.textContent = `Browsing ${genreName.toLowerCase()} films`;
 
     try {
-        const data = await tmdbFetch('/discover/movie', {
-            with_genres: genreId,
-            sort_by: 'popularity.desc',
-            page: 1,
-        });
-        showSearchResults(data.results, data.total_results, false);
-        searchQuery = `genre:${genreId}`;
+        const data = await omdbSearch(genreName, 1);
+        if (data.Response === 'True') {
+            totalSearchResults = parseInt(data.totalResults) || 0;
+            const movies = data.Search.map(normalizeOMDBSearchResult);
+            showSearchResults(movies, totalSearchResults, false);
+        } else {
+            showSearchResults([], 0, false);
+        }
     } catch (err) {
         console.error('Genre search error:', err);
     }
@@ -531,66 +590,64 @@ async function searchByGenre(genreId, genreName) {
 // --- Spotlight ---
 async function loadSpotlight() {
     try {
-        const data = await tmdbFetch('/trending/movie/day');
-        const movie = data.results[0];
-        if (!movie) return;
-        currentSpotlightId = movie.id;
+        // Pick a random movie from the trending list for spotlight
+        const spotlightId = CURATED.trending[Math.floor(Math.random() * 5)]; // pick from top 5
+        const movie = await omdbGetMovie(spotlightId);
+        if (!movie || movie.Response === 'False') return;
 
-        if (movie.backdrop_path) {
-            dom.spotlightBackdrop.style.backgroundImage = `url(${IMG_SIZES.backdrop}${movie.backdrop_path})`;
-            document.querySelector('.hero-bg').style.backgroundImage = `url(${IMG_SIZES.backdrop}${movie.backdrop_path})`;
+        const normalized = normalizeOMDBMovie(movie);
+        currentSpotlightId = normalized.id;
+
+        // Use poster as backdrop since OMDB doesn't have backdrops
+        if (normalized.poster) {
+            dom.spotlightBackdrop.style.backgroundImage = `url(${normalized.poster})`;
+            document.querySelector('.hero-bg').style.backgroundImage = `url(${normalized.poster})`;
         }
 
-        dom.spotlightTitle.textContent = movie.title;
-        dom.spotlightOverview.textContent = movie.overview;
+        dom.spotlightTitle.textContent = normalized.title;
+        dom.spotlightOverview.textContent = normalized.plot;
 
-        const year = (movie.release_date || '').substring(0, 4);
-        const rating = (movie.vote_average || 0).toFixed(1);
+        const genreList = normalized.genre.split(', ').slice(0, 3).join(', ');
         dom.spotlightMeta.innerHTML = `
-            <span class="meta-item"><strong>${rating}</strong> / 10</span>
+            <span class="meta-item"><strong>${normalized.rating.toFixed(1)}</strong> / 10</span>
             <span class="meta-dot"></span>
-            <span class="meta-item">${year}</span>
+            <span class="meta-item">${normalized.year}</span>
             <span class="meta-dot"></span>
-            <span class="meta-item">${getGenreNames(movie.genre_ids).slice(0, 3).join(', ')}</span>
+            <span class="meta-item">${genreList}</span>
         `;
 
-        if (movie.poster_path) {
-            dom.spotlightPoster.innerHTML = `<img src="${IMG_SIZES.poster}${movie.poster_path}" alt="${movie.title}">`;
+        if (normalized.poster) {
+            dom.spotlightPoster.innerHTML = `<img src="${normalized.poster}" alt="${normalized.title}">`;
         }
 
-        dom.spotlightDetailsBtn.onclick = () => openMovieModal(movie.id);
-        dom.spotlightTrailerBtn.onclick = () => playTrailer(movie.id);
+        dom.spotlightDetailsBtn.onclick = () => openMovieModal(normalized.id);
+        dom.spotlightTrailerBtn.onclick = () => searchTrailer(normalized.title, normalized.year);
     } catch (err) {
         console.error('Spotlight error:', err);
     }
 }
 
 // --- Load Sections ---
-async function loadTrending(timeWindow = 'day') {
+async function loadCuratedSection(containerId, ids) {
     try {
-        const data = await tmdbFetch(`/trending/movie/${timeWindow}`);
-        renderCarousel('trending-movies', data.results);
+        const data = await omdbBatchFetch(ids);
+        const movies = data.results.map(normalizeOMDBMovie);
+        renderCarousel(containerId, movies);
     } catch (err) {
-        console.error('Trending error:', err);
+        console.error(`Error loading ${containerId}:`, err);
     }
+}
+
+async function loadTrending() {
+    await loadCuratedSection('trending-movies', CURATED.trending);
 }
 
 async function loadTopRated() {
-    try {
-        const data = await tmdbFetch('/movie/top_rated');
-        renderCarousel('toprated-movies', data.results);
-    } catch (err) {
-        console.error('Top rated error:', err);
-    }
+    await loadCuratedSection('toprated-movies', CURATED.topRated);
 }
 
 async function loadUpcoming() {
-    try {
-        const data = await tmdbFetch('/movie/upcoming');
-        renderCarousel('upcoming-movies', data.results);
-    } catch (err) {
-        console.error('Upcoming error:', err);
-    }
+    await loadCuratedSection('upcoming-movies', CURATED.upcoming);
 }
 
 // --- Search ---
@@ -600,10 +657,18 @@ async function performSearch(query, page = 1) {
     searchPage = page;
 
     try {
-        const data = await tmdbFetch('/search/movie', { query, page });
+        const data = await omdbSearch(query, page);
         dom.searchResultsTitle.textContent = 'Search Results';
-        dom.searchResultsSubtitle.textContent = `${data.total_results.toLocaleString()} results for "${query}"`;
-        showSearchResults(data.results, data.total_results, page > 1);
+
+        if (data.Response === 'True') {
+            totalSearchResults = parseInt(data.totalResults) || 0;
+            dom.searchResultsSubtitle.textContent = `${totalSearchResults.toLocaleString()} results for "${query}"`;
+            const movies = data.Search.map(normalizeOMDBSearchResult);
+            showSearchResults(movies, totalSearchResults, page > 1);
+        } else {
+            dom.searchResultsSubtitle.textContent = `No results for "${query}"`;
+            showSearchResults([], 0, false);
+        }
     } catch (err) {
         console.error('Search error:', err);
     }
@@ -667,21 +732,21 @@ async function fetchSuggestions(query) {
         return;
     }
     try {
-        const data = await tmdbFetch('/search/movie', { query, page: 1 });
-        const results = data.results.slice(0, 6);
-        if (results.length === 0) {
+        const data = await omdbSearch(query, 1);
+        if (data.Response !== 'True' || !data.Search) {
             dom.searchSuggestions.classList.remove('active');
             return;
         }
+        const results = data.Search.slice(0, 6);
 
         dom.searchSuggestions.innerHTML = results.map(movie => {
-            const posterUrl = movie.poster_path ? `${IMG_SIZES.posterSmall}${movie.poster_path}` : PLACEHOLDER_POSTER;
-            const year = (movie.release_date || '').substring(0, 4);
+            const posterUrl = (movie.Poster && movie.Poster !== 'N/A') ? movie.Poster : PLACEHOLDER_POSTER;
+            const year = movie.Year || '';
             return `
-                <div class="suggestion-item" data-id="${movie.id}">
-                    <img class="suggestion-poster" src="${posterUrl}" alt="${movie.title}" loading="lazy">
+                <div class="suggestion-item" data-id="${movie.imdbID}">
+                    <img class="suggestion-poster" src="${posterUrl}" alt="${movie.Title}" loading="lazy">
                     <div class="suggestion-info">
-                        <div class="suggestion-title">${movie.title}</div>
+                        <div class="suggestion-title">${movie.Title}</div>
                         <div class="suggestion-year">${year}</div>
                     </div>
                 </div>
@@ -690,7 +755,7 @@ async function fetchSuggestions(query) {
 
         dom.searchSuggestions.querySelectorAll('.suggestion-item').forEach(item => {
             item.addEventListener('click', () => {
-                openMovieModal(parseInt(item.dataset.id));
+                openMovieModal(item.dataset.id);
                 dom.searchSuggestions.classList.remove('active');
             });
         });
@@ -707,12 +772,14 @@ async function openMovieModal(movieId) {
     document.body.style.overflow = 'hidden';
 
     try {
-        const [movie, credits, similar, videos] = await Promise.all([
-            tmdbFetch(`/movie/${movieId}`),
-            tmdbFetch(`/movie/${movieId}/credits`),
-            tmdbFetch(`/movie/${movieId}/similar`),
-            tmdbFetch(`/movie/${movieId}/videos`),
-        ]);
+        const movie = await omdbGetMovie(movieId);
+        if (!movie || movie.Response === 'False') {
+            showToast('Could not load movie details', 'error');
+            closeMovieModal();
+            return;
+        }
+
+        const m = normalizeOMDBMovie(movie);
 
         // Check favorite/watchlist status
         let isFavorite = false;
@@ -730,42 +797,47 @@ async function openMovieModal(movieId) {
             } catch { /* ignore */ }
         }
 
-        // Backdrop
-        if (movie.backdrop_path) {
-            dom.modalBackdrop.style.backgroundImage = `url(${IMG_SIZES.backdrop}${movie.backdrop_path})`;
+        // Backdrop — use poster since OMDB has no backdrops
+        if (m.poster) {
+            dom.modalBackdrop.style.backgroundImage = `url(${m.poster})`;
         } else {
             dom.modalBackdrop.style.backgroundImage = 'none';
             dom.modalBackdrop.style.background = 'var(--bg-card)';
         }
 
         // Poster
-        dom.modalPoster.src = movie.poster_path ? `${IMG_SIZES.poster}${movie.poster_path}` : PLACEHOLDER_POSTER;
-        dom.modalPoster.alt = movie.title;
+        dom.modalPoster.src = m.poster || PLACEHOLDER_POSTER;
+        dom.modalPoster.alt = m.title;
 
         // Rating
-        dom.modalRating.textContent = (movie.vote_average || 0).toFixed(1);
+        dom.modalRating.textContent = m.rating.toFixed(1);
 
         // Title & Tagline
-        dom.modalTitle.textContent = movie.title;
-        dom.modalTagline.textContent = movie.tagline || '';
-        dom.modalTagline.style.display = movie.tagline ? 'block' : 'none';
+        dom.modalTitle.textContent = m.title;
+        // OMDB doesn't have taglines, show awards instead if present
+        if (m.awards && m.awards !== 'N/A') {
+            dom.modalTagline.textContent = m.awards;
+            dom.modalTagline.style.display = 'block';
+        } else {
+            dom.modalTagline.textContent = '';
+            dom.modalTagline.style.display = 'none';
+        }
 
         // Meta
-        const year = (movie.release_date || '').substring(0, 4);
-        const runtime = movie.runtime ? `${Math.floor(movie.runtime / 60)}h ${movie.runtime % 60}m` : '';
-        const metaParts = [year, runtime, movie.original_language?.toUpperCase()].filter(Boolean);
+        const metaParts = [m.year, m.runtime !== 'N/A' ? m.runtime : '', m.rated !== 'N/A' ? m.rated : ''].filter(Boolean);
         dom.modalMeta.innerHTML = metaParts.map((p, i) => `
             ${i > 0 ? '<span class="meta-dot"></span>' : ''}
             <span class="meta-item">${p}</span>
         `).join('');
 
         // Genres
-        dom.modalGenres.innerHTML = (movie.genres || []).map(g =>
-            `<span class="modal-genre-tag">${g.name}</span>`
+        const genres = m.genre.split(', ').filter(g => g && g !== 'N/A');
+        dom.modalGenres.innerHTML = genres.map(g =>
+            `<span class="modal-genre-tag">${g}</span>`
         ).join('');
 
         // Overview
-        dom.modalOverview.textContent = movie.overview || 'No overview available.';
+        dom.modalOverview.textContent = (m.plot && m.plot !== 'N/A') ? m.plot : 'No overview available.';
 
         // Movie action buttons (favorite + watchlist)
         let actionsContainer = dom.movieModal.querySelector('.modal-actions');
@@ -787,8 +859,7 @@ async function openMovieModal(movieId) {
 
         $('modal-fav-btn').addEventListener('click', async (e) => {
             e.stopPropagation();
-            await toggleFavorite(movie.id, movie.title, movie.poster_path, movie.vote_average);
-            // Update button state
+            await toggleFavorite(m.id, m.title, m.poster, m.rating);
             const btn = $('modal-fav-btn');
             const nowFav = btn.classList.toggle('active');
             btn.querySelector('svg').setAttribute('fill', nowFav ? 'currentColor' : 'none');
@@ -797,7 +868,7 @@ async function openMovieModal(movieId) {
 
         $('modal-watch-btn').addEventListener('click', async (e) => {
             e.stopPropagation();
-            await toggleWatchlist(movie.id, movie.title, movie.poster_path, movie.vote_average);
+            await toggleWatchlist(m.id, m.title, m.poster, m.rating);
             const btn = $('modal-watch-btn');
             const nowWatch = btn.classList.toggle('active');
             btn.childNodes[btn.childNodes.length - 1].textContent = nowWatch ? 'In Watchlist' : 'Watchlist';
@@ -805,16 +876,21 @@ async function openMovieModal(movieId) {
 
         // Details Grid
         const details = [];
-        if (movie.status) details.push({ label: 'Status', value: movie.status });
-        if (movie.budget) details.push({ label: 'Budget', value: `$${(movie.budget / 1e6).toFixed(0)}M` });
-        if (movie.revenue) details.push({ label: 'Revenue', value: `$${(movie.revenue / 1e6).toFixed(0)}M` });
-        if (movie.vote_count) details.push({ label: 'Votes', value: movie.vote_count.toLocaleString() });
-        if (credits.crew) {
-            const director = credits.crew.find(c => c.job === 'Director');
-            if (director) details.push({ label: 'Director', value: director.name });
-        }
-        if (movie.production_companies?.length) {
-            details.push({ label: 'Studio', value: movie.production_companies[0].name });
+        if (m.director && m.director !== 'N/A') details.push({ label: 'Director', value: m.director });
+        if (m.writer && m.writer !== 'N/A') details.push({ label: 'Writer', value: m.writer.split(',').slice(0, 2).join(', ') });
+        if (m.language && m.language !== 'N/A') details.push({ label: 'Language', value: m.language });
+        if (m.country && m.country !== 'N/A') details.push({ label: 'Country', value: m.country });
+        if (m.boxOffice && m.boxOffice !== 'N/A') details.push({ label: 'Box Office', value: m.boxOffice });
+        if (m.metascore && m.metascore !== 'N/A') details.push({ label: 'Metascore', value: m.metascore + '/100' });
+        if (m.imdbVotes && m.imdbVotes !== 'N/A') details.push({ label: 'IMDb Votes', value: m.imdbVotes });
+
+        // Add external ratings
+        if (m.ratings && m.ratings.length > 0) {
+            m.ratings.forEach(r => {
+                if (r.Source === 'Rotten Tomatoes') {
+                    details.push({ label: 'Rotten Tomatoes', value: r.Value });
+                }
+            });
         }
 
         dom.modalDetailsGrid.innerHTML = details.map(d => `
@@ -824,45 +900,27 @@ async function openMovieModal(movieId) {
             </div>
         `).join('');
 
-        // Cast
-        const cast = (credits.cast || []).slice(0, 10);
-        if (cast.length) {
+        // Cast — OMDB gives actors as a comma-separated string
+        const actors = m.actors.split(', ').filter(a => a && a !== 'N/A');
+        if (actors.length) {
             dom.modalCastSection.style.display = 'block';
-            dom.modalCast.innerHTML = cast.map(c => `
+            dom.modalCast.innerHTML = actors.map(name => `
                 <div class="cast-item">
-                    <img class="cast-avatar" src="${c.profile_path ? IMG_SIZES.profile + c.profile_path : PLACEHOLDER_PROFILE}" alt="${c.name}" loading="lazy">
-                    <div class="cast-name">${c.name}</div>
-                    <div class="cast-character">${c.character || ''}</div>
+                    <img class="cast-avatar" src="${PLACEHOLDER_PROFILE}" alt="${name}" loading="lazy">
+                    <div class="cast-name">${name}</div>
+                    <div class="cast-character"></div>
                 </div>
             `).join('');
         } else {
             dom.modalCastSection.style.display = 'none';
         }
 
-        // Similar
-        const similarMovies = (similar.results || []).slice(0, 8);
-        if (similarMovies.length) {
-            dom.modalSimilarSection.style.display = 'block';
-            dom.modalSimilar.innerHTML = similarMovies.map(m => `
-                <div class="similar-item" data-id="${m.id}">
-                    <img class="similar-poster" src="${m.poster_path ? IMG_SIZES.posterSmall + m.poster_path : PLACEHOLDER_POSTER}" alt="${m.title}" loading="lazy">
-                    <div class="similar-title">${m.title}</div>
-                </div>
-            `).join('');
+        // Similar movies — OMDB doesn't have this, so hide
+        dom.modalSimilarSection.style.display = 'none';
 
-            dom.modalSimilar.querySelectorAll('.similar-item').forEach(item => {
-                item.addEventListener('click', () => {
-                    dom.modalOverlay.scrollTo({ top: 0, behavior: 'smooth' });
-                    openMovieModal(parseInt(item.dataset.id));
-                });
-            });
-        } else {
-            dom.modalSimilarSection.style.display = 'none';
-        }
-
-        // Store trailer info
-        const trailer = (videos.results || []).find(v => v.type === 'Trailer' && v.site === 'YouTube');
-        dom.movieModal.dataset.trailerId = trailer ? trailer.key : '';
+        // Store movie info for trailer search
+        dom.movieModal.dataset.movieTitle = m.title;
+        dom.movieModal.dataset.movieYear = m.year;
 
     } catch (err) {
         console.error('Modal error:', err);
@@ -875,28 +933,10 @@ function closeMovieModal() {
     document.body.style.overflow = '';
 }
 
-// --- Trailer ---
-async function playTrailer(movieId) {
-    try {
-        let trailerKey = '';
-
-        if (dom.movieModal.dataset.trailerId) {
-            trailerKey = dom.movieModal.dataset.trailerId;
-        } else {
-            const data = await tmdbFetch(`/movie/${movieId}/videos`);
-            const trailer = (data.results || []).find(v => v.type === 'Trailer' && v.site === 'YouTube');
-            if (trailer) trailerKey = trailer.key;
-        }
-
-        if (trailerKey) {
-            dom.trailerContainer.innerHTML = `<iframe src="https://www.youtube.com/embed/${trailerKey}?autoplay=1&rel=0" allow="autoplay; encrypted-media" allowfullscreen></iframe>`;
-            dom.trailerOverlay.classList.add('active');
-        } else {
-            showToast('No trailer available for this movie.', 'warning');
-        }
-    } catch (err) {
-        console.error('Trailer error:', err);
-    }
+// --- Trailer (search YouTube) ---
+function searchTrailer(title, year) {
+    const query = encodeURIComponent(`${title} ${year} official trailer`);
+    window.open(`https://www.youtube.com/results?search_query=${query}`, '_blank');
 }
 
 function closeTrailer() {
@@ -948,29 +988,19 @@ function setupEventListeners() {
     // Load more
     dom.loadMoreBtn.addEventListener('click', async () => {
         searchPage++;
-        if (searchQuery.startsWith('genre:')) {
-            const genreId = searchQuery.replace('genre:', '');
-            const data = await tmdbFetch('/discover/movie', {
-                with_genres: genreId,
-                sort_by: 'popularity.desc',
-                page: searchPage,
-            });
-            showSearchResults(data.results, data.total_results, true);
-        } else {
-            performSearch(searchQuery, searchPage);
-        }
+        await performSearch(searchQuery, searchPage);
     });
 
-    // Trending tabs
+    // Trending tabs — with OMDB we use the same curated list
     $('trending-day-tab').addEventListener('click', function () {
         this.classList.add('active');
         $('trending-week-tab').classList.remove('active');
-        loadTrending('day');
+        loadTrending();
     });
     $('trending-week-tab').addEventListener('click', function () {
         this.classList.add('active');
         $('trending-day-tab').classList.remove('active');
-        loadTrending('week');
+        loadTrending();
     });
 
     // Modal
@@ -987,7 +1017,11 @@ function setupEventListeners() {
 
     // Spotlight trailer button
     dom.spotlightTrailerBtn.addEventListener('click', () => {
-        if (currentSpotlightId) playTrailer(currentSpotlightId);
+        if (currentSpotlightId) {
+            const title = dom.movieModal.dataset.movieTitle || dom.spotlightTitle.textContent;
+            const year = dom.movieModal.dataset.movieYear || '';
+            searchTrailer(title, year);
+        }
     });
 
     // Keyboard
@@ -1084,14 +1118,13 @@ async function initApp() {
         // Auth check — non-blocking, don't let it break the app
         try { await checkAuth(); } catch (e) { console.warn('Auth check skipped:', e); }
 
-        await fetchGenres();
         renderGenreChips();
         setupEventListeners();
         setupCarousels();
 
         await Promise.all([
             loadSpotlight(),
-            loadTrending('day'),
+            loadTrending(),
             loadTopRated(),
             loadUpcoming(),
         ]);
